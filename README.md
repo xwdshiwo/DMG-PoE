@@ -6,6 +6,9 @@
   <img src="figures/fig1_framework.png" width="90%" alt="DMG-PoE Framework"/>
 </p>
 
+> **Note:** This repository is provided for peer review purposes. The code and documentation are in a pre-release state and may be updated following the review process. A stable public release will be made available upon paper acceptance.
+
+
 ## Overview
 
 DMG-PoE is a deep learning framework for multi-omics cancer survival prediction that natively handles **missing modalities**. Rather than imputing absent data, the framework explicitly models input reliability through three tightly integrated components:
