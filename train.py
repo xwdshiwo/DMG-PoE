@@ -30,7 +30,7 @@ def train_one_epoch(
 
     total_loss = 0.0
     total_nll = 0.0
-    total_ibs = 0.0
+    total_bc = 0.0
     n_batches = 0
 
     for batch in train_loader:
@@ -55,14 +55,14 @@ def train_one_epoch(
 
         total_loss += losses['total'].item()
         total_nll += losses['nll'].item()
-        if 'ibs' in losses:
-            total_ibs += losses['ibs'].item()
+        if 'bc' in losses:
+            total_bc += losses['bc'].item()
         n_batches += 1
 
     return {
         'loss': total_loss / n_batches,
         'nll': total_nll / n_batches,
-        'ibs': total_ibs / n_batches if total_ibs > 0 else 0,
+        'bc': total_bc / n_batches if total_bc > 0 else 0,
     }
 
 
@@ -147,7 +147,7 @@ def train_fold(
 
     loss_fn = DMGPoECalSurvLoss(
         num_time_bins=config['num_time_bins'],
-        lambda_ibs=config.get('lambda_ibs', 0.1),
+        lambda_bc=config.get('lambda_bc', 0.1),
         lambda_sc=config.get('lambda_sc', 0.1),
         use_calibration=config.get('use_calibration', True),
     )
@@ -173,7 +173,7 @@ def train_fold(
             'epoch': epoch,
             'train_loss': train_metrics['loss'],
             'train_nll': train_metrics['nll'],
-            'train_ibs': train_metrics['ibs'],
+            'train_bc': train_metrics['bc'],
             'test_loss': test_metrics['loss'],
             'test_c_index': test_metrics['c_index'],
         })
@@ -224,7 +224,7 @@ def main():
         'use_dmg': not args.no_dmg,
         'use_poe': not args.no_poe,
         'use_calibration': True,
-        'lambda_ibs': 0.1,
+        'lambda_bc': 0.1,
         'lambda_sc': 0.1,
         'use_incomplete': False,
     }

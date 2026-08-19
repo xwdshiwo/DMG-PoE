@@ -21,8 +21,10 @@ DMG-PoE is a deep learning framework for multi-omics cancer survival prediction 
 
 The training objective combines three losses:
 - **L<sub>NLL</sub>**: Negative log-likelihood for discrete-time survival
-- **L<sub>IBS</sub>**: Approximate Integrated Brier Score for calibration
+- **L<sub>BC</sub>**: Auxiliary discretized Brier calibration regularizer. At each time point, patients censored at or before that time are excluded because their status is unknown.
 - **L<sub>SC</sub>**: Subset Consistency loss for robustness to varying modality availability
+
+Reported IBS is an evaluation metric computed separately with inverse probability of censoring weighting (IPCW) in `metrics.py`.
 
 ## Installation
 
@@ -79,8 +81,8 @@ python run_benchmark.py \
 # Without DMG (zero imputation baseline)
 python run_benchmark.py --no_dmg --imputation_type zero
 
-# Without PoE (MoE gated fusion)
-python run_benchmark.py --fusion_type moe
+# Without PoE (post-DMG concatenation followed by a learnable projection)
+python run_benchmark.py --fusion_type concat
 
 # Without calibration losses (NLL only)
 python run_benchmark.py --no_calibration
@@ -105,7 +107,7 @@ DMG-PoE/
 │   ├── dmg.py                 # Dynamic Modality Graph (attention + soft mask)
 │   ├── fusion.py              # PoE / Hybrid-PoE / MoE / Average fusion
 │   ├── surv_head.py           # Discrete hazard head + NLL loss
-│   └── dmg_poe_calsurv.py     # Full model + calibration losses (IBS + SC)
+│   └── dmg_poe_calsurv.py     # Full model + auxiliary losses (L_BC + L_SC)
 ├── data_loader.py             # SurvBoard data loading & fold management
 ├── metrics.py                 # C-index, IBS, D-calibration evaluation
 ├── train.py                   # Single-cancer training script
@@ -127,7 +129,7 @@ DMG-PoE/
 | `dmg_heads` | 4 | Number of attention heads in DMG |
 | `num_time_bins` | 20 | Discrete time intervals for survival |
 | `dropout` | 0.3 | Dropout rate |
-| `lambda_ibs` | 0.1 | IBS loss weight |
+| `lambda_bc` | 0.1 | Brier calibration regularizer weight |
 | `lambda_sc` | 0.1 | Subset consistency loss weight |
 | `lr` | 1e-3 | Learning rate (AdamW) |
 

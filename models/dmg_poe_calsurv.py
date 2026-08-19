@@ -181,13 +181,13 @@ class DMGPoECalSurv(nn.Module):
 
 
 class CalibrationLoss(nn.Module):
-    """Calibration losses: approximate IBS + subset consistency."""
+    """Auxiliary Brier calibration and subset consistency losses."""
     
     def __init__(self, num_time_bins: int = 20):
         super().__init__()
         self.num_time_bins = num_time_bins
     
-    def compute_ibs_approx(
+    def compute_brier_calibration(
         self,
         survival: torch.Tensor,  # (batch, num_time_bins)
         events: torch.Tensor,    # (batch,)
@@ -195,26 +195,34 @@ class CalibrationLoss(nn.Module):
         max_time: float,
     ) -> torch.Tensor:
         """
-        Approximate Integrated Brier Score.
-        IBS = integral BS(t) dt / max_time
-        BS(t) = E[(S(t) - I(T>t))^2]
+        Discretized Brier calibration regularizer over observed patient-time
+        statuses.
+
+        At time t, patients followed beyond t are known to be event-free and
+        patients with an observed event by t are known to have experienced the
+        event. Patients censored at or before t are excluded because their
+        status at t is unknown. Reported evaluation IBS is computed separately
+        with IPCW in metrics.py.
         """
-        batch_size = survival.shape[0]
         device = survival.device
-        
+
         time_points = torch.linspace(0, 1, self.num_time_bins, device=device) * max_time
-        norm_times = times / max_time
-        
+
         brier_scores = []
         for t_idx in range(self.num_time_bins):
             t = time_points[t_idx]
             s_t = survival[:, t_idx]
-            indicator = (times > t).float()
-            bs = (s_t - indicator) ** 2
-            brier_scores.append(bs.mean())
-        
-        ibs = torch.stack(brier_scores).mean()
-        return ibs
+            target = (times > t).to(dtype=s_t.dtype)
+            known_status = (times > t) | ((events > 0.5) & (times <= t))
+
+            if known_status.any():
+                bs = (s_t[known_status] - target[known_status]) ** 2
+                brier_scores.append(bs.mean())
+
+        if not brier_scores:
+            return survival.sum() * 0.0
+
+        return torch.stack(brier_scores).mean()
     
     def compute_subset_consistency(
         self,
@@ -256,18 +264,18 @@ class CalibrationLoss(nn.Module):
 
 class DMGPoECalSurvLoss(nn.Module):
     """
-    Full loss: NLL + λ_ibs * IBS + λ_sc * SC
+    Full loss: NLL + lambda_bc * L_BC + lambda_sc * L_SC.
 
-    IBS warmup (optional):
-        The IBS weight can be ramped up linearly over a warmup period so the model
+    Brier calibration warmup (optional):
+        The L_BC weight can be ramped up linearly over a warmup period so the model
         first learns basic risk structure before calibration is enforced.
-        To enable, uncomment the body of update_lambda_ibs and call it each epoch.
+        To enable, uncomment the body of update_lambda_bc and call it each epoch.
 
         Example:
         -----------------------------------------------------------------------
-        # loss_fn = DMGPoECalSurvLoss(..., lambda_ibs=0.1)
+        # loss_fn = DMGPoECalSurvLoss(..., lambda_bc=0.1)
         # for epoch in range(total_epochs):
-        #     loss_fn.update_lambda_ibs(epoch, warmup_epochs=20)
+        #     loss_fn.update_lambda_bc(epoch, warmup_epochs=20)
         #     train_one_epoch(...)
         -----------------------------------------------------------------------
     """
@@ -275,7 +283,7 @@ class DMGPoECalSurvLoss(nn.Module):
     def __init__(
         self,
         num_time_bins: int = 20,
-        lambda_ibs: float = 0.1,
+        lambda_bc: float = 0.1,
         lambda_sc: float = 0.1,
         use_calibration: bool = True,
     ):
@@ -283,20 +291,20 @@ class DMGPoECalSurvLoss(nn.Module):
         
         self.nll_loss = NLLSurvivalLoss(num_time_bins)
         self.cal_loss = CalibrationLoss(num_time_bins) if use_calibration else None
-        self.lambda_ibs = lambda_ibs
-        self._lambda_ibs_base = lambda_ibs
+        self.lambda_bc = lambda_bc
+        self._lambda_bc_base = lambda_bc
         self.lambda_sc = lambda_sc
         self.use_calibration = use_calibration
 
-    def update_lambda_ibs(self, epoch: int, warmup_epochs: int = 20) -> None:
+    def update_lambda_bc(self, epoch: int, warmup_epochs: int = 20) -> None:
         """
-        Linear warmup for the IBS loss weight (disabled by default).
+        Linear warmup for the Brier calibration weight (disabled by default).
         Uncomment the block below and call once per epoch to enable.
         """
         # if epoch < warmup_epochs:
-        #     self.lambda_ibs = self._lambda_ibs_base * (epoch / warmup_epochs)
+        #     self.lambda_bc = self._lambda_bc_base * (epoch / warmup_epochs)
         # else:
-        #     self.lambda_ibs = self._lambda_ibs_base
+        #     self.lambda_bc = self._lambda_bc_base
         pass
     
     def forward(
@@ -317,12 +325,12 @@ class DMGPoECalSurvLoss(nn.Module):
         losses = {'nll': nll, 'total': nll}
         
         if self.use_calibration and self.cal_loss is not None:
-            if self.lambda_ibs > 0:
-                ibs = self.cal_loss.compute_ibs_approx(
+            if self.lambda_bc > 0:
+                bc = self.cal_loss.compute_brier_calibration(
                     outputs['survival'], events, times, max_time
                 )
-                losses['ibs'] = ibs
-                losses['total'] = losses['total'] + self.lambda_ibs * ibs
+                losses['bc'] = bc
+                losses['total'] = losses['total'] + self.lambda_bc * bc
 
             if self.lambda_sc > 0 and model is not None and features is not None and modality_indices is not None:
                 sc = self.cal_loss.compute_subset_consistency(
