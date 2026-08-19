@@ -150,7 +150,7 @@ def train_single_fold(cancer, fold, config, output_dir, device='cuda'):
 
     loss_fn = DMGPoECalSurvLoss(
         num_time_bins=config['num_time_bins'],
-        lambda_ibs=config.get('lambda_ibs', 0.1),
+        lambda_bc=config.get('lambda_bc', 0.1),
         lambda_sc=config.get('lambda_sc', 0.1),
         use_calibration=config.get('use_calibration', True),
     )
@@ -242,8 +242,10 @@ def main():
     parser.add_argument('--embed_dim', type=int, default=64, help='Embedding dimension')
     parser.add_argument('--no_dmg', action='store_true', help='Disable DMG module')
     parser.add_argument('--no_poe', action='store_true', help='Disable PoE fusion')
-    parser.add_argument('--no_calibration', action='store_true', help='Disable calibration losses')
-    parser.add_argument('--lambda_ibs', type=float, default=0.1, help='IBS loss weight')
+    parser.add_argument('--no_calibration', action='store_true',
+                       help='Disable Brier calibration and subset consistency losses')
+    parser.add_argument('--lambda_bc', type=float, default=0.1,
+                       help='Brier calibration regularizer weight')
     parser.add_argument('--lambda_sc', type=float, default=0.1, help='Subset consistency loss weight')
     parser.add_argument('--fusion_type', type=str, default='hybrid_poe',
                        choices=['hybrid_poe', 'poe', 'moe', 'average', 'concat'],
@@ -270,7 +272,7 @@ def main():
         'use_dmg': not args.no_dmg,
         'use_poe': not args.no_poe,
         'use_calibration': not args.no_calibration,
-        'lambda_ibs': args.lambda_ibs,
+        'lambda_bc': args.lambda_bc,
         'lambda_sc': args.lambda_sc,
         'fusion_type': args.fusion_type,
         'imputation_type': args.imputation_type,
