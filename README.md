@@ -1,6 +1,6 @@
-# DMG-PoE
+# Multi-Omics Survival Prediction under Modality Incompleteness via Dynamic Modality Graphs and Product-of-Experts Fusion
 
-**Robust Multi-Omics Survival Prediction with Missing Modalities via Dynamic Modality Graphs and Uncertainty-Aware Fusion**
+**DMG-PoE**
 
 <p align="center">
   <img src="figures/fig1_framework.png" width="90%" alt="DMG-PoE Framework"/>
@@ -29,7 +29,7 @@ Reported IBS is an evaluation metric computed separately with inverse probabilit
 ## Installation
 
 ```bash
-git clone https://github.com/<your-username>/DMG-PoE.git
+git clone https://github.com/xwdshiwo/DMG-PoE.git
 cd DMG-PoE
 pip install -r requirements.txt
 ```
@@ -91,6 +91,10 @@ python run_benchmark.py --no_calibration
 python run_benchmark.py --no_dmg --imputation_type mean
 ```
 
+The `concat` setting above is the w/o-PoE control reported in Table 5. A
+separate MoE-gated fusion option is also available through
+`--fusion_type moe`; it is not the Table 5 w/o-PoE control.
+
 ### Missing modality training
 
 ```bash
@@ -139,8 +143,8 @@ If you find this work useful, please cite:
 
 ```bibtex
 @article{dmgpoe2026,
-  title={Robust Multi-Omics Survival Prediction with Missing Modalities
-         via Dynamic Modality Graphs and Uncertainty-Aware Fusion},
+  title={Multi-Omics Survival Prediction under Modality Incompleteness
+         via Dynamic Modality Graphs and Product-of-Experts Fusion},
   author={},
   journal={},
   year={2026}
